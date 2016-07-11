@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<meta charset="utf-8">
-	<title>トランザクション一覧</title>
+	<title>アカウント情報一覧</title>
 	<link rel="stylesheet" href="http://code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
 	<script src="http://code.jquery.com/jquery-1.10.2.js"></script>
 	<script src="http://code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
@@ -11,17 +11,24 @@
 		label, input { display:block; }
 		fieldset { padding:0; border:0; margin-top:25px; }
 		h1 { font-size: 1.2em; margin: .6em 0; }
-		div#users-contain table { margin: 1em 0; border-collapse: collapse; width: 100%; }
-		div#users-contain table td, div#users-contain table th { border: 1px solid #eee; padding: .6em 10px; text-align: left; }
+		div#trans-contain table { margin: 1em 0; border-collapse: collapse; width: 100%; }
+		div#trans-contain table td, div#trans-contain table th { border: 1px solid #eee; padding: .6em 10px; text-align: left; }
 
 		.ui-dialog .ui-state-error { padding: .3em; }
 		.validateTips { border: 1px solid transparent; padding: 0.3em; }
 	</style>
 	<script>
+
+var MY_IP_PORT = "xx.xx.xx.xx:7895";
+var ACCOUNT_TRANSFERS                = "http://" + MY_IP_PORT + "/account/transfers/all?address=";
+var ACCOUNT_GET                      = "http://" + MY_IP_PORT + "/account/get?address=";
+var ACCOUNT_MOSAIC_OWNED             = "http://" + MY_IP_PORT + "/account/mosaic/owned?address=";
+var ACCOUNT_UNCONFIRMED_TRANSACTIONS = "http://" + MY_IP_PORT + "/account/unconfirmedTransactions?address=";
+
 $(function() {
 
-	function sendAjax(){
-		var URL ="http://xx.xx.xx.xx:7895/account/transfers/all?address=" + address;
+	function sendAjax(URL){
+		URL +=  address;
 		return $.ajax({url: URL ,type: 'GET'});
 	}
 
@@ -40,41 +47,156 @@ $(function() {
 		address = item["address"];
 	}
 
-	sendAjax().done(
+	sendAjax(ACCOUNT_TRANSFERS).done(
 		function(result){
 
 			var dataArray = result.data;
 			dataArray.forEach(function(val){
 			
 				var tran = val.transaction;
-				var mosaics = tran.mosaics;
-				var strMosaics = "";
-				if(mosaics){
-					mosaics.forEach(function(mval){
-						console.log(mval);
-						strMosaics += mval.quantity + mval.mosaicId.name + "<br />";
-					});
-				}
-				$( "#users tbody" ).append( "<tr>" +
+				var tran_fee       = (!tran.otherTrans) ? tran.fee        : tran.fee       + "<br />"  + tran.otherTrans.fee;
+				var tran_recipient = (!tran.otherTrans) ? tran.recipient  : tran.recipient + "<br />"  + tran.otherTrans.recipient;
+				var tran_signer    = (!tran.otherTrans) ? tran.signer     : tran.signer    + "<br />"  + tran.otherTrans.signer;
+	
+				$( "#trans tbody" ).append( "<tr>" +
 					"<td>" + tran.timeStamp + "</td>" +
 					"<td>" + tran.type + "</td>" +
-					"<td>" + tran.fee + "</td>" +
-					"<td>" + tran.recipient + "</td>" +
-					"<td>" + tran.signer + "</td>" +
-					"<td>" + strMosaics + "</td>" +
+					"<td>" + tran_fee + "</td>" +
+					"<td>" + tran_recipient + "</td>" +
+					"<td>" + tran_signer + "</td>" +
 				"</tr>" );
 			});
 		}
 	);
 
+	sendAjax(ACCOUNT_GET).done(
+		function(result){
+
+			
+			var account = result.account;
+
+			$( "#account tbody" ).append( "<tr>" +
+				"<td>" + account.address + "</td>" +
+				"<td>" + account.publicKey + "</td>" +
+				"<td>" + account.balance + "</td>" +
+				"<td>" + account.multisigInfo.cosignatoriesCount + "</td>" +
+				"<td>" + account.multisigInfo.minCosignatories + "</td>" +
+			"</tr>" );
+
+
+			var cosignatoriesArray = result.meta.cosignatories;
+			cosignatoriesArray.forEach(function(val){
+			
+				$( "#multisig tbody" ).append( "<tr>" +
+					"<td>cosignatories</td>" +
+					"<td>" + val.address + "</td>" +
+					"<td>" + val.publicKey + "</td>" +
+					"<td>" + val.balance + "</td>" +
+				"</tr>" );
+			});
+
+			var cosignatoryOfArray = result.meta.cosignatoryOf;
+			cosignatoryOfArray.forEach(function(val){
+			
+				
+				$( "#multisig tbody" ).append( "<tr>" +
+					"<td>cosignatoryOf</td>" +
+					"<td>" + val.address + "</td>" +
+					"<td>" + val.publicKey + "</td>" +
+					"<td>" + val.balance + "</td>" +
+				"</tr>" );
+			});
+		}
+	);
+
+	sendAjax(ACCOUNT_MOSAIC_OWNED).done(
+		function(result){
+
+			var dataArray = result.data;
+			dataArray.forEach(function(val){
+
+				var mosaicId = val.mosaicId;
+				$( "#mosaic tbody" ).append( "<tr>" +
+					"<td>" + mosaicId.namespaceId + "</td>" +
+					"<td>" + mosaicId.name + "</td>" +
+					"<td>" + val.quantity + "</td>" +
+
+				"</tr>" );
+			});
+		}
+	);
+
+	sendAjax(ACCOUNT_UNCONFIRMED_TRANSACTIONS).done(
+		function(result){
+			var dataArray = result.data;
+			dataArray.forEach(function(val){
+			
+				var tran = val.transaction;
+				var tran_fee       = (!tran.otherTrans) ? tran.fee        : tran.fee       + "<br />"  + tran.otherTrans.fee;
+				var tran_recipient = (!tran.otherTrans) ? tran.recipient  : tran.recipient + "<br />"  + tran.otherTrans.recipient;
+				var tran_signer    = (!tran.otherTrans) ? tran.signer     : tran.signer    + "<br />"  + tran.otherTrans.signer;
+
+				$( "#untrans tbody" ).append( "<tr>" +
+					"<td>" + val.meta.data + "</td>" +
+					"<td>" + tran.timeStamp + "</td>" +
+					"<td>" + tran.type + "</td>" +
+					"<td>" + tran_fee + "</td>" +
+					"<td>" + tran_recipient + "</td>" +
+					"<td>" + tran_signer + "</td>" +
+				"</tr>" );
+			});
+		}
+	);
 });
 
   </script>
 </head>
 <body>
-<div id="users-contain" class="ui-widget">
+<div id="trans-contain" class="ui-widget">
+<h1>アカウント情報:</h1>
+  <table id="account" class="ui-widget ui-widget-content">
+	<thead>
+	  <tr class="ui-widget-header ">
+		<th>address</th>
+		<th>publicKey</th>
+		<th>balance</th>
+		<th>cosignatoriesCount</th>
+		<th>minCosignatories</th>
+	  </tr>
+	</thead>
+	<tbody>
+	</tbody>
+  </table>
+
+<h1>マルチシグ情報:</h1>
+  <table id="multisig" class="ui-widget ui-widget-content">
+	<thead>
+	  <tr class="ui-widget-header ">
+		<th>type</th>
+		<th>address</th>
+		<th>publicKey</th>
+		<th>balance</th>
+	  </tr>
+	</thead>
+	<tbody>
+	</tbody>
+  </table>
+
+<h1>所有Mosaic:</h1>
+  <table id="mosaic" class="ui-widget ui-widget-content">
+	<thead>
+	  <tr class="ui-widget-header ">
+		<th>namespace</th>
+		<th>name</th>
+		<th>quantity</th>
+	  </tr>
+	</thead>
+	<tbody>
+	</tbody>
+  </table>
+
 <h1>直近のトランザクション:</h1>
-  <table id="users" class="ui-widget ui-widget-content">
+  <table id="trans" class="ui-widget ui-widget-content">
 	<thead>
 	  <tr class="ui-widget-header ">
 		<th>timeStamp</th>
@@ -82,14 +204,29 @@ $(function() {
 		<th>fee</th>
 		<th>recipient</th>
 		<th>signer</th>
-		<th>mosaics</th>
 	  </tr>
 	</thead>
 	<tbody>
 	</tbody>
   </table>
+
+<h1>未承認トランザクション:</h1>
+  <table id="untrans" class="ui-widget ui-widget-content">
+	<thead>
+	  <tr class="ui-widget-header ">
+		<th>innerHash</th>
+		<th>timeStamp</th>
+		<th>type</th>
+		<th>fee</th>
+		<th>recipient</th>
+		<th>signer</th>
+	  </tr>
+	</thead>
+	<tbody>
+	</tbody>
+  </table>
+
 </div>
  
 </body>
 </html>
-
